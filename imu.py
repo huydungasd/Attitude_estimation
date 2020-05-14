@@ -12,15 +12,15 @@ class IMU:
         print("[IMU] Initialised.")
     
     def get_t(self):
-        return self.data[:, 0]         
+        return self.data[1:, 0]         
         
     # deg/s
     def get_gyro(self):
-        return [self.data[:, 4], self.data[:, 5], self.data[:, 6]]        
+        return [self.data[1:, 7], self.data[1:, 8], self.data[1:, 9]]        
         
     # m/s^2
     def get_acc(self):
-        return [-self.data[:, 1], -self.data[:, 2], -self.data[:, 3]]
+        return [self.data[1:, 1], self.data[1:, 2], self.data[1:, 3]]
     
     # rad
     def get_acc_angles(self):

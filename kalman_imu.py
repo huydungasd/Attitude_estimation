@@ -10,6 +10,7 @@ from math import sin, cos, tan, pi
 
 
 
+fname = "data0.csv"
 # Calculates Rotation Matrix given euler angles.
 def eulerAnglesToRotationMatrix(theta_deg) :
     theta = np.array([math.radians(theta_deg[0]), math.radians(theta_deg[1]), math.radians(theta_deg[2])])
@@ -42,12 +43,12 @@ def movingaverage(values, window):
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-imu = IMU(file_path= os.path.join(dir_path, "data.csv"))
+imu = IMU(file_path= os.path.join(dir_path, fname))
 
 # Initialise matrices and variables
 C = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
 P = np.eye(4)
-Q = np.eye(4)*10
+Q = np.eye(4)*100
 R = np.eye(2)
 
 state_estimate = np.array([[0], [0], [0], [0]])
@@ -57,21 +58,31 @@ theta_hat = np.zeros(imu.data.shape[0] - 1)
 gamma_hat = np.zeros(imu.data.shape[0] - 1)
 
 # Orientation by iternal algorithm of IMU sensor
-phi, theta, gamma = imu.data[:, 9], imu.data[:, 8], imu.data[:, 7]
+phi, theta, gamma = -imu.data[1:, 12], -imu.data[1:, 11], -imu.data[1:, 10]
+for i in range(len(gamma)):
+    if gamma[i] < -180:
+        gamma[i] += 360
+phi = movingaverage(phi, 10)
+theta = movingaverage(theta, 10)
+gamma = movingaverage(gamma, 10)
 
 [phi_acc, theta_acc] = imu.get_acc_angles()
-# phi_acc = movingaverage(phi_acc, window=10)
-# theta_acc = movingaverage(theta_acc, window=10)
+phi_acc = movingaverage(phi_acc, window=10)
+theta_acc = movingaverage(theta_acc, window=10)
 
 # Calculate accelerometer offsets
-N = 15
+N = 500
 phi_offset = 0.0
 theta_offset = 0.0
+phi_true_offset = 0
+theta_true_offset = 0
 for i in range(N):
     phi_offset += phi_acc[i]
     theta_offset += theta_acc[i]
-phi_offset = float(phi_offset) / float(N)
-theta_offset = float(theta_offset) / float(N)
+    phi_true_offset += phi[i]
+    theta_true_offset += theta[i]
+phi_offset = float(phi_offset) / float(N) - phi_true_offset / N
+theta_offset = float(theta_offset) / float(N) - theta_true_offset / N
 print("Accelerometer offsets: " + str(phi_offset) + "," + str(theta_offset))
 sleep(2)
 
@@ -81,10 +92,12 @@ theta_acc -= theta_offset
 
 # Get gyro measurements and calculate Euler angle derivatives
 [p, q, r] = imu.get_gyro()
-
+p = movingaverage(p, 10)
+q = movingaverage(q, 10)
+r = movingaverage(r, 10)
 
 print("Running...")
-t = imu.get_t()/10**6
+t = imu.get_t()
 phi_hat[0], theta_hat[0], gamma_hat[0] = phi[0], theta[0], gamma[0]
 phi_mes, theta_mes, gamma_mes = np.zeros(phi_hat.shape), np.zeros(phi_hat.shape), np.zeros(phi_hat.shape)
 phi_mes[0], theta_mes[0], gamma_mes[0] = phi[0], theta[0], gamma[0]
@@ -130,9 +143,25 @@ for i in range(imu.data.shape[0] - 2):
 
 # Display results
 plt.figure()
-plt.plot(t[:-1], phi_hat, label='phi_hat (Prediction)')
+plt.plot(t, phi_hat, label='phi_hat (Prediction)')
 # plt.plot(t[:-1], phi_acc[:-1], label='phi_acc')
-plt.plot(t[:-1], phi[:-1], label='phi by internal algo of IMU sensor')
-plt.plot(t[:-1], phi_mes, label='phi_mes (Measurement)')
+plt.plot(t, phi, label='phi by internal algo of IMU sensor')
+plt.plot(t, phi_mes, label='phi_mes (Measurement)')
+plt.legend()
+
+
+plt.figure()
+plt.plot(t, theta_hat, label='theta_hat (Prediction)')
+# plt.plot(t[:-1], theta_acc[:-1], label='theta_acc')
+plt.plot(t, theta, label='theta by internal algo of IMU sensor')
+plt.plot(t, theta_mes, label='theta_mes (Measurement)')
+plt.legend()
+
+
+plt.figure()
+plt.plot(t, gamma_hat, label='gamma_hat (Prediction)')
+# plt.plot(t[:-1], gamma_acc[:-1], label='gamma_acc')
+plt.plot(t, gamma, label='gamma by internal algo of IMU sensor')
+plt.plot(t, gamma_mes, label='gamma_mes (Measurement)')
 plt.legend()
 plt.show()
