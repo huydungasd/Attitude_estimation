@@ -47,7 +47,7 @@ imu = IMU(file_path= os.path.join(dir_path, "data.csv"))
 # Initialise matrices and variables
 C = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
 P = np.eye(4)
-Q = np.eye(4)*1000
+Q = np.eye(4)*10
 R = np.eye(2)
 
 state_estimate = np.array([[0], [0], [0], [0]])
@@ -60,8 +60,8 @@ gamma_hat = np.zeros(imu.data.shape[0] - 1)
 phi, theta, gamma = imu.data[:, 9], imu.data[:, 8], imu.data[:, 7]
 
 [phi_acc, theta_acc] = imu.get_acc_angles()
-phi_acc = movingaverage(phi_acc, window=10)
-theta_acc = movingaverage(theta_acc, window=10)
+# phi_acc = movingaverage(phi_acc, window=10)
+# theta_acc = movingaverage(theta_acc, window=10)
 
 # Calculate accelerometer offsets
 N = 15
