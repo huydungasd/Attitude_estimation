@@ -17,6 +17,9 @@ class IMU:
     # deg/s
     def get_gyro(self):
         return [self.data[1:, 7], self.data[1:, 8], self.data[1:, 9]]        
+
+    def get_mag(self):
+        return [self.data[1:, 4], self.data[1:, 5], self.data[1:, 6]]    
         
     # m/s^2
     def get_acc(self):
