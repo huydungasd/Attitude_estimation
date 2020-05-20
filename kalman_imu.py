@@ -54,7 +54,7 @@ R1 = np.eye(2)*3
 C2 = np.array([[1, 0]])
 P2 = np.eye(2)
 Q2 = np.eye(2)*50
-R2 = np.eye(1)*1
+R2 = np.eye(1)*0.1
 
 state_estimate1 = np.array([[0], [0], [0], [0]])
 state_estimate2 = np.array([[0], [0]])
@@ -144,8 +144,6 @@ for i in range(imu.data.shape[0] - 2):
     state_estimate1 = A1 @ state_estimate1 + B1 @ gyro_input
     
 
-    # measurement = np.array([[phi_acc[i]], [theta_acc[i]]])
-    # if 9.6 *0< np.sqrt(ax[i]**2 + ay[i]**2 + az[i]**2) < 10*100:
     measurement1 = np.array([[phi_acc[i]], [theta_acc[i]]])
     P1 = A1 @ P1 @ A1.T + Q1
     y_tilde1 = measurement1 - C1 @ state_estimate1
