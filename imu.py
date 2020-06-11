@@ -14,7 +14,7 @@ class IMU:
     def get_t(self):
         return self.data[1:, 0]         
         
-    # deg/s
+    # rad/s
     def get_gyro(self):
         return [self.data[1:, 7], self.data[1:, 8], self.data[1:, 9]]        
 
@@ -30,4 +30,12 @@ class IMU:
         [ax, ay, az] = self.get_acc()
         phi = np.arctan2(ay, np.sqrt(ax ** 2.0 + az ** 2.0))
         theta = np.arctan2(-ax, np.sqrt(ay ** 2.0 + az ** 2.0))
-        return [phi / math.pi * 180, theta / math.pi * 180]
+        return [phi, theta]
+
+def get_mag_yaw(mag_x, mag_y, mag_z, prev_angle):
+    a = -mag_y * np.cos(prev_angle[0]) + mag_z * np.sin(prev_angle[0])
+    b = mag_x * np.cos(prev_angle[1])
+    c = mag_y * np.sin(prev_angle[1]) * np.sin(prev_angle[0])
+    d = mag_z * np.sin(prev_angle[1]) * np.cos(prev_angle[0])
+
+    return (np.arctan2(a,  (b + c + d)) + np.pi/2)
