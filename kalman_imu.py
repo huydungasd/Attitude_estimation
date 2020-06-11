@@ -3,7 +3,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-from squaternion import Quaternion
+from scipy.spatial.transform import Rotation
 from imu import *
 from numpy import convolve
 from time import sleep, time
@@ -14,6 +14,7 @@ from math import sin, cos, tan, pi
 fname = "145.csv"
 # Calculates Rotation Matrix given euler angles.
 def eulerAnglesToRotationMatrix(theta) :
+    """
     R_x = np.array([[1,         0,                  0                   ],
                     [0,         math.cos(theta[0]), -math.sin(theta[0]) ],
                     [0,         math.sin(theta[0]), math.cos(theta[0])  ]
@@ -31,6 +32,8 @@ def eulerAnglesToRotationMatrix(theta) :
                     
                     
     R = R_z @ R_y @ R_x
+    """
+    R = Rotation.from_euler('xyz', theta).as_matrix()
     return R
 
 # Lissage des signaux
@@ -125,9 +128,7 @@ phi_interg, theta_interg, gamma_interg = np.zeros(phi_hat.shape), np.zeros(phi_h
 phi_interg[0], theta_interg[0], gamma_interg[0] = phi[0], theta[0], gamma[0]
 list1, list2 = [], []
 
-last = -100
 for i in range(imu.data.shape[0] - 2):
-
     # Sampling time
     dt = t[i+1] - t[i]
 
@@ -142,9 +143,7 @@ for i in range(imu.data.shape[0] - 2):
     R_12 = eulerAnglesToRotationMatrix(angle_change)
     R_01 = eulerAnglesToRotationMatrix(prev_angle_intergral)
     R_02 = R_01 @ R_12
-    phi_interg[i+1] = math.atan2(R_02[2, 1], R_02[2, 2])
-    theta_interg[i+1] = math.atan2(-R_02[2, 0], np.sqrt(R_02[2, 1]**2 + R_02[2, 2]**2))
-    gamma_interg[i+1] = math.atan2(R_02[1, 0], R_02[0, 0])
+    phi_interg[i+1], theta_interg[i+1], gamma_interg[i+1] = Rotation.from_matrix(R_02).as_euler('xyz')
 
     # Kalman filter
     A1 = np.array([ [1, -dt, 0, 0], \
@@ -196,8 +195,8 @@ for i in range(imu.data.shape[0] - 2):
 
 # Display results
 fig, axs = plt.subplots(3, 1, sharex=True)
-axs[0].plot(t[list1], phi_hat[list1], '.b', label=r'$\hat{\phi}$ (Prediction)')
-axs[0].plot(t[list2], phi_hat[list2], '.r', label=r'$\hat{\phi}$ (Prediction)')
+axs[0].plot(t[list1], phi_hat[list1], '.b', label='$\hat{\phi}$ (Prediction)')
+axs[0].plot(t[list2], phi_hat[list2], '.r', label='$\hat{\phi}$ (Prediction)')
 axs[0].plot(t, phi, 'c', label='$\phi$ by internal algo of IMU sensor')
 axs[0].plot(t, phi_interg, 'g', label='$\phi_{interg}$ (Intergration)')
 axs[0].set_ylabel('Rad')
