@@ -11,7 +11,7 @@ from math import sin, cos, tan, pi
 
 
 
-fname = "145.csv"
+fname = "3.csv"
 # Calculates Rotation Matrix given euler angles.
 def eulerAnglesToRotationMatrix(theta) :
     """
@@ -36,6 +36,32 @@ def eulerAnglesToRotationMatrix(theta) :
     R = Rotation.from_euler('xyz', theta).as_matrix()
     return R
 
+def SHOE(imudata, g, W=5, G=4.1e8, sigma_a=0.00098**2, sigma_w=(8.7266463e-5)**2):
+    T = np.zeros(np.int(np.floor(imudata.shape[0]/W)+1))
+    zupt = np.zeros(imudata.shape[0])
+    a = np.zeros((1,3))
+    w = np.zeros((1,3))
+    inv_a = 1/sigma_a
+    inv_w = 1/sigma_w
+    acc = imudata[:,0:3]
+    gyro = imudata[:,3:6]
+
+    i=0
+    for k in range(0,imudata.shape[0]-W+1,W): #filter through all imu readings
+        smean_a = np.mean(acc[k:k+W,:],axis=0)
+        for s in range(k,k+W):
+            a.put([0,1,2],acc[s,:])
+            w.put([0,1,2],gyro[s,:])
+            T[i] += inv_a*( (a - g * smean_a/np.linalg.norm(smean_a)).dot(( a - g * smean_a/np.linalg.norm(smean_a)).T)) #acc terms
+            T[i] += inv_w*( (w).dot(w.T) )
+        zupt[k:k+W].fill(T[i])
+        i+=1
+    zupt = zupt/W
+    plt.figure()
+    plt.plot(zupt)
+    plt.show()
+    return zupt < G
+
 # Lissage des signaux
 def movingaverage(values, window):
     weights = np.repeat(1.0, window)/window
@@ -50,14 +76,14 @@ imu = IMU(file_path= os.path.join(dir_path, fname))
 
 # Initialise matrices and variables
 C1 = np.array([[1, 0, 0, 0], [0, 0, 1, 0]])
-P1 = np.eye(4)
-Q1 = np.eye(4)*0.01
-R1 = np.eye(2)
+P1 = np.eye(4)*(0.1*np.pi/180)**2
+Q1 = np.eye(4)*(0.1*np.pi/180)**2
+R1 = np.eye(2)*(np.pi/180)**2
 
 C2 = np.array([[1, 0]])
-P2 = np.eye(2)
-Q2 = np.eye(2)
-R2 = np.eye(1)
+P2 = np.eye(2)*(0.1*np.pi/180)**2
+Q2 = np.eye(2)*(0.1*np.pi/180)**2
+R2 = np.eye(1)*(np.pi/180)**2
 
 thresshold = 0.1
 
@@ -73,26 +99,26 @@ phi, theta, gamma = -imu.data[1:, 12], -imu.data[1:, 11], -imu.data[1:, 10]
 for i in range(len(gamma)):
     if gamma[i] < -pi:
         gamma[i] += 2*pi
-phi = movingaverage(phi, 10)
-theta = movingaverage(theta, 10)
-gamma = movingaverage(gamma, 10)
+# phi = movingaverage(phi, 10)
+# theta = movingaverage(theta, 10)
+# gamma = movingaverage(gamma, 10)
 
 [ax, ay, az] = imu.get_acc()
 [phi_acc, theta_acc] = imu.get_acc_angles()
-phi_acc = movingaverage(phi_acc, window=10)
-theta_acc = movingaverage(theta_acc, window=10)
+# phi_acc = movingaverage(phi_acc, window=10)
+# theta_acc = movingaverage(theta_acc, window=10)
 
 # Get gyro measurements and calculate Euler angle derivatives
 [p, q, r] = imu.get_gyro()
-p = movingaverage(p, 10)
-q = movingaverage(q, 10)
-r = movingaverage(r, 10)
+# p = movingaverage(p, 10)
+# q = movingaverage(q, 10)
+# r = movingaverage(r, 10)
 
 # Get gyro measurements and calculate Euler angle derivatives
 [mag_x, mag_y, mag_z] = imu.get_mag()
-mag_x = movingaverage(mag_x, 10)
-mag_y = movingaverage(mag_y, 10)
-mag_z = movingaverage(mag_z, 10)
+# mag_x = movingaverage(mag_x, 10)
+# mag_y = movingaverage(mag_y, 10)
+# mag_z = movingaverage(mag_z, 10)
 
 # Calculate accelerometer offsets
 N = 50
@@ -128,6 +154,7 @@ phi_interg, theta_interg, gamma_interg = np.zeros(phi_hat.shape), np.zeros(phi_h
 phi_interg[0], theta_interg[0], gamma_interg[0] = phi[0], theta[0], gamma[0]
 list1, list2 = [], []
 
+zupt = SHOE(np.hstack((ax.reshape((-1,1)), ay.reshape((-1,1)), az.reshape((-1,1)), p.reshape((-1,1)), q.reshape((-1,1)), r.reshape((-1,1)))), g=9.802, G=0.5e7)
 for i in range(imu.data.shape[0] - 2):
     # Sampling time
     dt = t[i+1] - t[i]
@@ -184,7 +211,7 @@ for i in range(imu.data.shape[0] - 2):
 
     measurement2 = get_mag_yaw(mag_x[i], mag_y[i], mag_z[i], prev_angle) - gamma_offset
     P2 = A2 @ P2 @ A2.T + Q2
-    if 9.7 < np.linalg.norm(np.array([ax[i], ay[i], az[i]])) < 9.9 and np.linalg.norm(np.array([p[i], q[i], r[i]])) < thresshold:
+    if zupt[i]:
         y_tilde2 = measurement2 - C2 @ state_estimate2
         S2 = R2 + C2 @ P2 @ C2.T
         K2 = P2 @ C2.T @ np.linalg.inv(S2)
@@ -195,8 +222,9 @@ for i in range(imu.data.shape[0] - 2):
 
 # Display results
 fig, axs = plt.subplots(3, 1, sharex=True)
-axs[0].plot(t[list1], phi_hat[list1], '.b', label='$\hat{\phi}$ (Prediction)')
-axs[0].plot(t[list2], phi_hat[list2], '.r', label='$\hat{\phi}$ (Prediction)')
+axs[0].plot(t, phi_hat, 'b', label='$\hat{\\phi}$ (Prediction)')
+# axs[0].plot(t[list1], phi_hat[list1], '.b', label='$\hat{\phi}$ (Prediction)')
+# axs[0].plot(t[list2], phi_hat[list2], '.r', label='$\hat{\phi}$ (Prediction)')
 axs[0].plot(t, phi, 'c', label='$\phi$ by internal algo of IMU sensor')
 axs[0].plot(t, phi_interg, 'g', label='$\phi_{interg}$ (Intergration)')
 axs[0].set_ylabel('Rad')
